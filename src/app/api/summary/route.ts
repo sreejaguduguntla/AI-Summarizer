@@ -23,14 +23,19 @@ export async function POST(req: Request) {
 
     const chatCompletion = await groq.chat.completions.create({
       messages: [{ role: "user", content: prompt }],
-      model: "llama3-8b-8192", // <--- THIS LINE HAS BEEN UPDATED
+      model: "llama3-8b-8192",
     });
 
     const summary = chatCompletion.choices[0]?.message?.content || "";
     
     return NextResponse.json({ summary: summary });
-  } catch (err: any) {
+  } catch (err: unknown) {
+    const errorMessage = 
+      typeof err === "object" && err !== null && "message" in err
+        ? (err as { message: string }).message
+        : "Internal server error";
+
     console.error("❌ /api/summary unexpected error:", err);
-    return NextResponse.json({ error: "Internal server error" }, { status: 500 });
+    return NextResponse.json({ error: errorMessage }, { status: 500 });
   }
 }

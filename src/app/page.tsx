@@ -46,8 +46,12 @@ export default function Page() {
         setSummary(data.summary || "");
         if (data.warning) setWarning(data.warning);
       }
-    } catch (e: any) {
-      setError(e.message || "Network error");
+    } catch (e: unknown) {
+      const errorMessage =
+        typeof e === "object" && e !== null && "message" in e
+          ? (e as { message: string }).message
+          : "Network error";
+      setError(errorMessage);
     } finally {
       setLoading(false);
     }
@@ -76,8 +80,12 @@ export default function Page() {
         setSendFeedback("✅ Email sent successfully!");
         setEmail("");
       }
-    } catch (e: any) {
-      setSendFeedback("❌ " + e.message);
+    } catch (e: unknown) {
+      const errorMessage =
+        typeof e === "object" && e !== null && "message" in e
+          ? (e as { message: string }).message
+          : "Network error";
+      setSendFeedback("❌ " + errorMessage);
     } finally {
       setIsSending(false);
     }

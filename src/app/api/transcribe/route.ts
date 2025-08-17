@@ -18,10 +18,15 @@ export async function POST(req: Request) {
     });
 
     return NextResponse.json({ transcript: transcription.text });
-  } catch (err: any) {
+  } catch (err: unknown) {
+    const errorMessage = 
+      typeof err === "object" && err !== null && "message" in err
+        ? (err as { message: string }).message
+        : "Internal server error during transcription";
+
     console.error("❌ /api/transcribe unexpected error:", err);
     return NextResponse.json(
-      { error: err.message || "Internal server error during transcription" },
+      { error: errorMessage },
       { status: 500 }
     );
   }
