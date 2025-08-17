@@ -1,95 +1,161 @@
-import Image from "next/image";
-import styles from "./page.module.css";
+"use client";
+import { useState } from "react";
 
-export default function Home() {
+export default function Page() {
+  const [transcript, setTranscript] = useState("");
+  const [instruction, setInstruction] = useState("");
+  const [summary, setSummary] = useState("");
+  const [loading, setLoading] = useState(false);
+  const [warning, setWarning] = useState("");
+  const [error, setError] = useState("");
+  const [email, setEmail] = useState("");
+  const [isSending, setIsSending] = useState(false);
+  const [sendFeedback, setSendFeedback] = useState("");
+
+  async function handleTextFileUpload(e: React.ChangeEvent<HTMLInputElement>) {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    const text = await file.text();
+    setTranscript(text);
+  }
+
+  async function handleSummarize() {
+    setLoading(true);
+    setSummary("");
+    setWarning("");
+    setError("");
+
+    if (!transcript.trim()) {
+      setError("Please upload a file or paste a transcript.");
+      setLoading(false);
+      return;
+    }
+
+    try {
+      const res = await fetch("/api/summary", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ transcript, instruction }),
+      });
+
+      const data = await res.json();
+      if (!res.ok) {
+        setError(data.error || "Server returned an error");
+        if (data.summary) setSummary(data.summary);
+      } else {
+        setSummary(data.summary || "");
+        if (data.warning) setWarning(data.warning);
+      }
+    } catch (e: any) {
+      setError(e.message || "Network error");
+    } finally {
+      setLoading(false);
+    }
+  }
+
+  async function handleSendEmail() {
+    setSendFeedback("");
+
+    if (!email.trim() || !summary.trim()) {
+      setSendFeedback("❌ Please enter a recipient email and ensure a summary is generated.");
+      return;
+    }
+
+    setIsSending(true);
+
+    try {
+      const res = await fetch("/api/sendEmail", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ email, summary }),
+      });
+      const data = await res.json();
+      if (!res.ok) {
+        setSendFeedback("❌ Failed: " + (data.error || "Server error"));
+      } else {
+        setSendFeedback("✅ Email sent successfully!");
+        setEmail("");
+      }
+    } catch (e: any) {
+      setSendFeedback("❌ " + e.message);
+    } finally {
+      setIsSending(false);
+    }
+  }
+
   return (
-    <div className={styles.page}>
-      <main className={styles.main}>
-        <Image
-          className={styles.logo}
-          src="/next.svg"
-          alt="Next.js logo"
-          width={180}
-          height={38}
-          priority
-        />
-        <ol>
-          <li>
-            Get started by editing <code>src/app/page.tsx</code>.
-          </li>
-          <li>Save and see your changes instantly.</li>
-        </ol>
+    <main style={{ maxWidth: 900, margin: 24, fontFamily: "system-ui, sans-serif" }}>
+      <h1>AI Meeting Notes Summarizer</h1>
 
-        <div className={styles.ctas}>
-          <a
-            className={styles.primary}
-            href="https://vercel.com/new?utm_source=create-next-app&utm_medium=appdir-template&utm_campaign=create-next-app"
-            target="_blank"
-            rel="noopener noreferrer"
-          >
-            <Image
-              className={styles.logo}
-              src="/vercel.svg"
-              alt="Vercel logomark"
-              width={20}
-              height={20}
+      <div style={{ marginTop: 12 }}>
+        <p>Upload a text file:</p>
+        <input
+          type="file"
+          accept=".txt"
+          onChange={handleTextFileUpload}
+        />
+      </div>
+
+      <input
+        placeholder="Instruction (e.g. Summarize in bullet points for executives)"
+        value={instruction}
+        onChange={(e) => setInstruction(e.target.value)}
+        style={{ width: "100%", padding: 8, marginTop: 12 }}
+      />
+
+      <textarea
+        placeholder="Or paste transcript here..."
+        value={transcript}
+        onChange={(e) => setTranscript(e.target.value)}
+        rows={8}
+        style={{ width: "100%", padding: 8, marginTop: 8, fontFamily: "monospace" }}
+      />
+
+      <div style={{ marginTop: 12 }}>
+        <button onClick={handleSummarize} disabled={loading} style={{ padding: "8px 16px" }}>
+          {loading ? "⏳ Generating Summary..." : "Generate Summary"}
+        </button>
+      </div>
+
+      {error && <p style={{ color: "red", marginTop: 12 }}>{error}</p>}
+      {warning && <p style={{ color: "orange", marginTop: 12 }}>{warning}</p>}
+
+      {summary && (
+        <div style={{ marginTop: 16, padding: 12, border: "1px solid #ddd", borderRadius: 6 }}>
+          <h2>Summary</h2>
+          <textarea
+            value={summary}
+            onChange={(e) => setSummary(e.target.value)}
+            rows={10}
+            style={{ width: "100%", padding: 8, fontFamily: "monospace" }}
+          />
+          <div style={{ marginTop: 12 }}>
+            <input
+              placeholder="Recipient email(s) (comma separated)"
+              value={email}
+              onChange={(e) => setEmail(e.target.value)}
+              style={{ width: "70%", padding: 8 }}
             />
-            Deploy now
-          </a>
-          <a
-            href="https://nextjs.org/docs?utm_source=create-next-app&utm_medium=appdir-template&utm_campaign=create-next-app"
-            target="_blank"
-            rel="noopener noreferrer"
-            className={styles.secondary}
-          >
-            Read our docs
-          </a>
+            <button
+              onClick={handleSendEmail}
+              disabled={isSending}
+              style={{ marginLeft: 8, padding: "8px 16px" }}
+            >
+              {isSending ? "⏳ Sending..." : "Share via Email"}
+            </button>
+          </div>
+          {sendFeedback && (
+            <p
+              style={{
+                color: sendFeedback.startsWith("✅") ? "green" : "red",
+                marginTop: 8,
+              }}
+            >
+              {sendFeedback}
+            </p>
+          )}
         </div>
-      </main>
-      <footer className={styles.footer}>
-        <a
-          href="https://nextjs.org/learn?utm_source=create-next-app&utm_medium=appdir-template&utm_campaign=create-next-app"
-          target="_blank"
-          rel="noopener noreferrer"
-        >
-          <Image
-            aria-hidden
-            src="/file.svg"
-            alt="File icon"
-            width={16}
-            height={16}
-          />
-          Learn
-        </a>
-        <a
-          href="https://vercel.com/templates?framework=next.js&utm_source=create-next-app&utm_medium=appdir-template&utm_campaign=create-next-app"
-          target="_blank"
-          rel="noopener noreferrer"
-        >
-          <Image
-            aria-hidden
-            src="/window.svg"
-            alt="Window icon"
-            width={16}
-            height={16}
-          />
-          Examples
-        </a>
-        <a
-          href="https://nextjs.org?utm_source=create-next-app&utm_medium=appdir-template&utm_campaign=create-next-app"
-          target="_blank"
-          rel="noopener noreferrer"
-        >
-          <Image
-            aria-hidden
-            src="/globe.svg"
-            alt="Globe icon"
-            width={16}
-            height={16}
-          />
-          Go to nextjs.org →
-        </a>
-      </footer>
-    </div>
+      )}
+    </main>
   );
 }
