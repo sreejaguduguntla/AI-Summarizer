@@ -1,9 +1,5 @@
 import { NextResponse } from "next/server";
-import { Ollama } from "ollama";
-
-export const runtime = "nodejs";
-
-const ollama = new Ollama({ host: "http://127.0.0.1:11434" });
+import Groq from "groq-sdk";
 
 export async function POST(req: Request) {
   try {
@@ -11,43 +7,30 @@ export async function POST(req: Request) {
     const { transcript, instruction } = body;
 
     if (!transcript) {
-      return NextResponse.json(
-        { error: "Transcript is required" },
-        { status: 400 }
-      );
+      return NextResponse.json({ error: "Transcript is required" }, { status: 400 });
     }
+
+    const groqApiKey = process.env.GROQ_API_KEY;
+    if (!groqApiKey) {
+      return NextResponse.json({ error: "Groq API key is not set" }, { status: 500 });
+    }
+
+    const groq = new Groq({ apiKey: groqApiKey });
 
     const prompt = instruction
       ? `${instruction}: ${transcript}`
       : `Summarize the following meeting notes: ${transcript}`;
 
-    const modelName = "mistral:latest";
-
-    const models = await ollama.list();
-    const isModelAvailable = models.models.some(
-      (m) => m.name === modelName
-    );
-    if (!isModelAvailable) {
-      return NextResponse.json(
-        {
-          error: `Model '${modelName}' is not available. Please run 'ollama pull ${modelName}'`,
-        },
-        { status: 404 }
-      );
-    }
-
-    const response = await ollama.generate({
-      model: modelName,
-      prompt: prompt,
-      stream: false,
+    const chatCompletion = await groq.chat.completions.create({
+      messages: [{ role: "user", content: prompt }],
+      model: "llama3-8b-8192", // <--- THIS LINE HAS BEEN UPDATED
     });
 
-    return NextResponse.json({ summary: response.response });
+    const summary = chatCompletion.choices[0]?.message?.content || "";
+    
+    return NextResponse.json({ summary: summary });
   } catch (err: any) {
     console.error("❌ /api/summary unexpected error:", err);
-    return NextResponse.json(
-      { error: "Internal server error" },
-      { status: 500 }
-    );
+    return NextResponse.json({ error: "Internal server error" }, { status: 500 });
   }
 }
